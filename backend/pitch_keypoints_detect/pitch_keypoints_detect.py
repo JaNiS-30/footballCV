@@ -11,11 +11,9 @@ class PitchKeypointsDetect:
         self.vertex_annotator = sv.VertexAnnotator(color=sv.Color.from_hex('#FF1493'), radius=8)
     
     def detect_keypoints(self, frame):
-        #"""Detecta os keypoints do campo no frame e retorna os pontos filtrados."""
         result = self.model.infer(frame, confidence=self.confidence_threshold)[0]
         key_points = sv.KeyPoints.from_inference(result)
 
-        # Filtra os pontos de referência com confiança > 0.5
         filter = key_points.confidence[0] > 0.5
         frame_reference_points = key_points.xy[0][filter]
         frame_reference_key_points = sv.KeyPoints(
@@ -24,7 +22,6 @@ class PitchKeypointsDetect:
         return frame_reference_key_points
 
     def annotate_frame(self, frame, key_points):
-        #"""Anota os pontos de referência no frame."""
         annotated_frame = frame.copy()
         annotated_frame = self.vertex_annotator.annotate(
             scene=annotated_frame,
