@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video Processing</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
+    <h1>Upload Video for Processing</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+      <input type="file" name="file" id="fileInput" accept="video/*" required />
+      <button type="submit">Upload</button>
+    </form>
+    <div id="loading" style="display: none">Processing...</div>
+    <div id="result" style="display: none">
+      <h2>Processed Video:</h2>
+      <video id="outputVideo" controls>
+        <source
+          src="http://techslides.com/demos/sample-videos/small.mp4"
+          type="video/mp4"
+        />
+      </video>
+    </div>
+    <script>
+      document
+        .getElementById('uploadForm')
+        .addEventListener('submit', async (event) => {
+          event.preventDefault();
+          document.getElementById('loading').style.display = 'block';
+          document.getElementById('result').style.display = 'none';
+
+          const formData = new FormData();
+          formData.append(
+            'file',
+            document.getElementById('fileInput').files[0]
+          );
+
+          console.log('Uploading file...');
+          const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData,
+          });
+
+          document.getElementById('loading').style.display = 'none';
+
+          if (response.ok) {
+            console.log('File uploaded successfully');
+            const data = await response.json();
+            const videoUrl = data.video_url;
+            const videoElement = document.getElementById('outputVideo');
+            videoElement.src = videoUrl;
+            videoElement.load(); // Adicione esta linha para garantir que o vídeo seja carregado
+            document.getElementById('result').style.display = 'block';
+            console.log('Video URL:', videoUrl);
+          } else {
+            console.error('Failed to process video');
+            alert('Failed to process video');
+          }
+        });
+    </script>
+  </body>
+</html>

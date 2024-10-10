@@ -1,0 +1,8 @@
+backend/training/
+backend/input_videos/
+backend/output_videos/
+backend/runs/
+backend/stubs/
+uploads/
+output_videos/
+backend/__pycache__/
