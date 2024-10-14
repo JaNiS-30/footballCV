@@ -7,6 +7,7 @@ from camera_movement_estimator import CameraMovementEstimator
 from view_transformer import ViewTransformer
 from speed_and_distance_estimator import SpeedAndDistanceEstimator
 
+
 def main(input_video_path, output_video_path):
     video_frames = read_video(input_video_path)
 
@@ -15,15 +16,18 @@ def main(input_video_path, output_video_path):
     tracks = tracker.get_object_tracks(
         video_frames, read_from_stub=True, stub_path="backend/stubs/tracks_stubs.pkl"
     )
-    
+
     tracker.add_position_to_tracks(tracks)
 
     camera_movement_estimator = CameraMovementEstimator(video_frames[0])
     camera_movement_per_frame = camera_movement_estimator.get_camera_movement(
-        video_frames, read_from_stub=True, stub_path="backend/stubs/camera_movement_stub.pkl"
+        video_frames,
+        read_from_stub=True,
+        stub_path="backend/stubs/camera_movement_stub.pkl",
     )
-    
-    camera_movement_estimator.add_adjust_positions_to_tracks(tracks, camera_movement_per_frame)
+    camera_movement_estimator.add_adjust_positions_to_tracks(
+        tracks, camera_movement_per_frame
+    )
 
     view_transformer = ViewTransformer()
     view_transformer.add_transformed_position_to_tracks(tracks)
@@ -31,8 +35,9 @@ def main(input_video_path, output_video_path):
     tracks["ball"] = tracker.interpolate_ball_positions(tracks["ball"])
 
     speed_and_distance_estimator = SpeedAndDistanceEstimator()
-    max_speed_and_distance = speed_and_distance_estimator.add_speed_and_distance_to_tracks(tracks)
-    print(max_speed_and_distance)
+    max_speed_and_distance = (
+        speed_and_distance_estimator.add_speed_and_distance_to_tracks(tracks)
+    )
 
     team_assigner = TeamAssigner()
     team_assigner.assign_team_color(video_frames[0], tracks["players"][0])
@@ -47,6 +52,8 @@ def main(input_video_path, output_video_path):
             tracks["players"][frame_num][player_id]["team_color"] = (
                 team_assigner.team_colors[team]
             )
+
+    team_assigner.resolve_goalkeepers_team_id(tracks["players"], tracks["goalkeepers"])
 
     player_assigner = PlayerBallAssigner()
     team_ball_control = []
@@ -76,6 +83,7 @@ def main(input_video_path, output_video_path):
     speed_and_distance_estimator.draw_speed_and_distance(output_video_frames, tracks)
 
     save_video(output_video_frames, output_video_path)
+
 
 if __name__ == "__main__":
     main("input_videos/08fd33_4.mp4", "output_videos/output_video.mp4")

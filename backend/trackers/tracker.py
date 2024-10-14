@@ -17,17 +17,15 @@ class Tracker:
         self.tracker = sv.ByteTrack()
 
     def add_position_to_tracks(self, tracks):
-        for object,object_tracks in tracks.items():
+        for object, object_tracks in tracks.items():
             for frame_num, track in enumerate(object_tracks):
                 for track_id, track_info in track.items():
-                    bbox = track_info['bbox']
-                    if object == 'ball':
+                    bbox = track_info["bbox"]
+                    if object == "ball":
                         position = get_center_of_bbox(bbox)
                     else:
                         position = get_foot_position(bbox)
-                    tracks[object][frame_num][track_id]['position'] = position
-                
-                
+                    tracks[object][frame_num][track_id]["position"] = position
 
     def interpolate_ball_positions(self, ball_positions):
         ball_positions = [x.get(1, {}).get("bbox", []) for x in ball_positions]
@@ -61,13 +59,16 @@ class Tracker:
 
         detections = self.detect_frames(frames)
 
-        tracks = {"players": [], "referees": [], "ball": []}
+        tracks = {"players": [], "goalkeepers": [], "referees": [], "ball": []}
 
         for frame_num, detection in enumerate(detections):
             cls_names = detection.names
             cls_names_inv = {v: k for k, v in cls_names.items()}
-
             detection_supervision = sv.Detections.from_ultralytics(detection)
+
+            original_detection_with_tracks = self.tracker.update_with_detections(
+                detection_supervision
+            )
 
             for object_ind, class_id in enumerate(detection_supervision.class_id):
                 if cls_names[class_id] == "goalkeeper":
@@ -78,6 +79,7 @@ class Tracker:
             )
 
             tracks["players"].append({})
+            tracks["goalkeepers"].append({})
             tracks["referees"].append({})
             tracks["ball"].append({})
 
@@ -91,6 +93,14 @@ class Tracker:
 
                 if cls_id == cls_names_inv["referee"]:
                     tracks["referees"][frame_num][track_id] = {"bbox": bbox}
+
+            for frame_detection in original_detection_with_tracks:
+                bbox = frame_detection[0].tolist()
+                cls_id = frame_detection[3]
+                track_id = frame_detection[4]
+
+                if cls_id == cls_names_inv["goalkeeper"]:
+                    tracks["goalkeepers"][frame_num][track_id] = {"bbox": bbox}
 
             for frame_detection in detection_supervision:
                 bbox = frame_detection[0].tolist()
@@ -170,18 +180,38 @@ class Tracker:
         cv2.rectangle(overlay, (1350, 850), (1900, 970), (255, 255, 255), -1)
         alpha = 0.4
         cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
-        
-        team_ball_control_till_frame = team_ball_control[:frame_num+1]
 
-        team_1_num_frames = team_ball_control_till_frame[team_ball_control_till_frame == 1].shape[0]
-        team_2_num_frames = team_ball_control_till_frame[team_ball_control_till_frame == 2].shape[0]
+        team_ball_control_till_frame = team_ball_control[: frame_num + 1]
 
-        team_1 = team_1_num_frames / (team_1_num_frames + team_2_num_frames) 
-        team_2 = team_2_num_frames / (team_1_num_frames + team_2_num_frames) 
-        
-        cv2.putText(frame, f"Team 1 Ball Control: {team_1*100:.2f}", (1400, 900), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
-        cv2.putText(frame, f"Team 2 Ball Control: {team_2*100:.2f}", (1400, 950), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
-        
+        team_1_num_frames = team_ball_control_till_frame[
+            team_ball_control_till_frame == 1
+        ].shape[0]
+        team_2_num_frames = team_ball_control_till_frame[
+            team_ball_control_till_frame == 2
+        ].shape[0]
+
+        team_1 = team_1_num_frames / (team_1_num_frames + team_2_num_frames)
+        team_2 = team_2_num_frames / (team_1_num_frames + team_2_num_frames)
+
+        cv2.putText(
+            frame,
+            f"Team 1 Ball Control: {team_1*100:.2f}",
+            (1400, 900),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 0, 0),
+            3,
+        )
+        cv2.putText(
+            frame,
+            f"Team 2 Ball Control: {team_2*100:.2f}",
+            (1400, 950),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 0, 0),
+            3,
+        )
+
         return frame
 
     def draw_annotations(self, video_frames, tracks, team_ball_control):

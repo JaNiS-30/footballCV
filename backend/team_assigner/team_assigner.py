@@ -1,4 +1,6 @@
 from sklearn.cluster import KMeans
+import numpy as np
+import supervision as sv
 
 
 class TeamAssigner:
@@ -69,9 +71,34 @@ class TeamAssigner:
         team_id = self.kmeans.predict(player_color.reshape(1, -1))[0]
         team_id += 1
 
-        if player_id == 91:
-            team_id = 1
-
         self.player_team_dict[player_id] = team_id
 
         return team_id
+
+    def resolve_goalkeepers_team_id(players: dict, goalkeepers: dict) -> dict:
+        non_goalkeepers = {k: v for k, v in players.items() if k not in goalkeepers}
+
+        players_xy = np.array(
+            [player["position_adjusted"] for player in non_goalkeepers.values()]
+        )
+        players_class_id = np.array(
+            [player["team"] for player in non_goalkeepers.values()]
+        )
+
+        goalkeepers_xy = np.array(
+            [goalkeeper["position_adjusted"] for goalkeeper in goalkeepers.values()]
+        )
+
+        team_0_centroid = players_xy[players_class_id == 0].mean(axis=0)
+        team_1_centroid = players_xy[players_class_id == 1].mean(axis=0)
+
+        for goalkeeper_id, goalkeeper_xy in zip(goalkeepers.keys(), goalkeepers_xy):
+            dist_0 = np.linalg.norm(goalkeeper_xy - team_0_centroid)
+            dist_1 = np.linalg.norm(goalkeeper_xy - team_1_centroid)
+
+            if dist_0 < dist_1:
+                players[goalkeeper_id]["team"] = 0
+            else:
+                players[goalkeeper_id]["team"] = 1
+
+        return players
