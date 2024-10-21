@@ -7,6 +7,8 @@ class TeamAssigner:
     def __init__(self):
         self.team_colors = {}
         self.player_team_dict = {}
+        self.team_change_count = {}
+        self.team_stable_threshold = 5
 
     def get_clustering_model(self, image):
         image_2d = image.reshape(-1, 3)
@@ -62,20 +64,28 @@ class TeamAssigner:
         self.team_colors[1] = kmeans.cluster_centers_[0]
         self.team_colors[2] = kmeans.cluster_centers_[1]
 
-    def get_player_team(self, frame, player_bbox, player_id):
-        if player_id in self.player_team_dict:
-            return self.player_team_dict[player_id]
+    def get_player_team(self, frame, player_bbox, player_id, previous_players):
+        # Tentar encontrar o jogador mais próximo se houver detecção anterior
+        closest_player_id = self.find_closest_player(player_bbox, previous_players)
 
-        player_color = self.get_player_color(frame, player_bbox)
+        # Verificar se há um time atribuído ao jogador correspondente
+        if closest_player_id and closest_player_id in self.player_team_dict:
+            stable_team_id = self.player_team_dict[closest_player_id]
+        else:
+            # Se não, calcular a cor e determinar o time usando KMeans
+            player_color = self.get_player_color(frame, player_bbox)
+            predicted_team_id = self.kmeans.predict(player_color.reshape(1, -1))[0] + 1
+            stable_team_id = self.update_team_with_stability(player_id, predicted_team_id)
 
-        team_id = self.kmeans.predict(player_color.reshape(1, -1))[0]
-        team_id += 1
+        # Armazenar o time final
+        self.player_team_dict[player_id] = stable_team_id
 
-        self.player_team_dict[player_id] = team_id
+        return stable_team_id
 
-        return team_id
-
-    def resolve_goalkeepers_team_id(players: dict, goalkeepers: dict) -> dict:
+    def resolve_goalkeepers_team_id(
+        self, player_id: str, players: dict, goalkeepers: dict
+    ) -> int:
+        is_goalkeeper = player_id in goalkeepers
         non_goalkeepers = {k: v for k, v in players.items() if k not in goalkeepers}
 
         players_xy = np.array(
@@ -85,20 +95,67 @@ class TeamAssigner:
             [player["team"] for player in non_goalkeepers.values()]
         )
 
-        goalkeepers_xy = np.array(
-            [goalkeeper["position_adjusted"] for goalkeeper in goalkeepers.values()]
+        team_1_centroid = (
+            players_xy[players_class_id == 1].mean(axis=0)
+            if np.any(players_class_id == 1)
+            else np.zeros(2)
+        )
+        team_2_centroid = (
+            players_xy[players_class_id == 2].mean(axis=0)
+            if np.any(players_class_id == 2)
+            else np.zeros(2)
         )
 
-        team_0_centroid = players_xy[players_class_id == 0].mean(axis=0)
-        team_1_centroid = players_xy[players_class_id == 1].mean(axis=0)
+        if is_goalkeeper:
+            player_position = goalkeepers[player_id]["position_adjusted"]
+        else:
+            player_position = players[player_id]["position_adjusted"]
 
-        for goalkeeper_id, goalkeeper_xy in zip(goalkeepers.keys(), goalkeepers_xy):
-            dist_0 = np.linalg.norm(goalkeeper_xy - team_0_centroid)
-            dist_1 = np.linalg.norm(goalkeeper_xy - team_1_centroid)
+        dist_1 = np.linalg.norm(player_position - team_1_centroid)
+        dist_2 = np.linalg.norm(player_position - team_2_centroid)
 
-            if dist_0 < dist_1:
-                players[goalkeeper_id]["team"] = 0
-            else:
-                players[goalkeeper_id]["team"] = 1
+        return 1 if dist_1 < dist_2 else 2
 
-        return players
+    def find_closest_player(self, current_bbox, previous_players):
+        """Encontra o jogador mais próximo com base na distância Euclidiana."""
+        current_center = np.array([
+            (current_bbox[0] + current_bbox[2]) / 2,
+            (current_bbox[1] + current_bbox[3]) / 2,
+        ])
+
+        min_distance = float("inf")
+        closest_player_id = None
+
+        for player_id, player_info in previous_players.items():
+            previous_center = np.array([
+                (player_info["bbox"][0] + player_info["bbox"][2]) / 2,
+                (player_info["bbox"][1] + player_info["bbox"][3]) / 2,
+            ])
+            distance = np.linalg.norm(current_center - previous_center)
+
+            if distance < min_distance:
+                min_distance = distance
+                closest_player_id = player_id
+
+        return closest_player_id
+
+    def update_team_with_stability(self, player_id, new_team_id):
+        """Aplica estabilidade na mudança de time."""
+        if player_id not in self.team_change_count:
+            self.team_change_count[player_id] = {"current_team": new_team_id, "count": 0}
+
+        current_info = self.team_change_count[player_id]
+
+        if current_info["current_team"] == new_team_id:
+            current_info["count"] += 1
+        else:
+            # Resetar o contador se a predição mudou
+            current_info["count"] = 1
+            current_info["current_team"] = new_team_id
+
+        # Confirmar a mudança somente se o contador atingir o limite
+        if current_info["count"] >= self.team_stable_threshold:
+            return new_team_id
+
+        # Caso contrário, manter o time anterior
+        return self.player_team_dict.get(player_id, new_team_id)
