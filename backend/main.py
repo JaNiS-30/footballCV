@@ -1,5 +1,6 @@
 from utils import read_video, save_video
 from trackers import Tracker
+from tracker_pitch import TrackerPitch
 import numpy as np
 from team_assigner import TeamAssigner
 from player_ball_assigner import PlayerBallAssigner
@@ -7,6 +8,7 @@ from camera_movement_estimator import CameraMovementEstimator
 from view_transformer import ViewTransformer
 from speed_and_distance_estimator import SpeedAndDistanceEstimator
 from pitch import Pitch
+from inference import get_model
 
 
 def main(input_video_path, output_video_path):
@@ -15,7 +17,15 @@ def main(input_video_path, output_video_path):
     tracker = Tracker("backend/models/best.pt")
 
     tracks = tracker.get_object_tracks(
-        video_frames, read_from_stub=True, stub_path="backend/stubs/tracks_stubs.pkl"
+        video_frames, read_from_stub=True, stub_path="backend/stubs/tracks_stub.pkl"
+    )
+
+    trackerPitch = TrackerPitch("backend/models/bestPitch.pt")
+
+    tracksPitch = trackerPitch.get_pitch_tracks(
+        video_frames,
+        read_from_stub=True,
+        stub_path="backend/stubs/tracks_pitch_stub.pkl",
     )
 
     tracker.add_position_to_tracks(tracks)
@@ -39,6 +49,7 @@ def main(input_video_path, output_video_path):
     max_speed_and_distance = (
         speed_and_distance_estimator.add_speed_and_distance_to_tracks(tracks)
     )
+    
     team_assigner = TeamAssigner()
     team_assigner.assign_team_color(video_frames[0], tracks["players"][0])
 
@@ -108,7 +119,11 @@ def main(input_video_path, output_video_path):
 
     pitch = Pitch()
     pitch.generate_pitch_view_video(
-        video_frames, tracks, team_ball_control, "output_videos/output_pitch_points.mp4"
+        video_frames=video_frames,
+        tracks=tracks,
+        tracks_pitch=tracksPitch,
+        team_ball_control=team_ball_control,
+        output_video_path="output_videos/output_pitch_points.mp4",
     )
 
     pitch.generate_voronoi_video(

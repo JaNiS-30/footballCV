@@ -8,7 +8,7 @@ class TeamAssigner:
         self.team_colors = {}
         self.player_team_dict = {}
         self.team_change_count = {}
-        self.team_stable_threshold = 5
+        self.team_stable_threshold = 8
 
     def get_clustering_model(self, image):
         image_2d = image.reshape(-1, 3)

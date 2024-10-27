@@ -28,18 +28,28 @@ class Tracker:
                     tracks[object][frame_num][track_id]["position"] = position
 
     def interpolate_ball_positions(self, ball_positions):
-        ball_positions = [x.get(1, {}).get("bbox", []) for x in ball_positions]
-        df_ball_positions = pd.DataFrame(
-            ball_positions, columns=["x1", "y1", "x2", "y2"]
-        )
+        ball_data = [
+            (x.get(1, {}).get("bbox", []), x.get(1, {}).get("position_adjusted", None))
+            for x in ball_positions
+        ]
+        
+        bbox_list = [data[0] for data in ball_data]
+        df_ball_positions = pd.DataFrame(bbox_list, columns=["x1", "y1", "x2", "y2"])
 
         df_ball_positions = df_ball_positions.interpolate()
         df_ball_positions = df_ball_positions.bfill()
 
-        ball_positions = [
-            {1: {"bbox": x}} for x in df_ball_positions.to_numpy().tolist()
+        interpolated_ball_positions = [
+            {
+                1: {
+                    "bbox": bbox,
+                    "position_adjusted": position_adjusted,
+                }
+            }
+            for bbox, (_, position_adjusted) in zip(df_ball_positions.to_numpy(), ball_data)
         ]
-        return ball_positions
+
+        return interpolated_ball_positions
 
     def detect_frames(self, frames):
         batch_size = 20
@@ -51,7 +61,7 @@ class Tracker:
         return detections
 
     def get_object_tracks(self, frames, read_from_stub=False, stub_path=None):
-
+        
         if read_from_stub and stub_path is not None and os.path.exists(stub_path):
             with open(stub_path, "rb") as f:
                 tracks = pickle.load(f)
