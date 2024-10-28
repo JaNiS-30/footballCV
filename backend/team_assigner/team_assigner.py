@@ -65,19 +65,15 @@ class TeamAssigner:
         self.team_colors[2] = kmeans.cluster_centers_[1]
 
     def get_player_team(self, frame, player_bbox, player_id, previous_players):
-        # Tentar encontrar o jogador mais próximo se houver detecção anterior
         closest_player_id = self.find_closest_player(player_bbox, previous_players)
 
-        # Verificar se há um time atribuído ao jogador correspondente
         if closest_player_id and closest_player_id in self.player_team_dict:
             stable_team_id = self.player_team_dict[closest_player_id]
         else:
-            # Se não, calcular a cor e determinar o time usando KMeans
             player_color = self.get_player_color(frame, player_bbox)
             predicted_team_id = self.kmeans.predict(player_color.reshape(1, -1))[0] + 1
             stable_team_id = self.update_team_with_stability(player_id, predicted_team_id)
 
-        # Armazenar o time final
         self.player_team_dict[player_id] = stable_team_id
 
         return stable_team_id
@@ -149,13 +145,10 @@ class TeamAssigner:
         if current_info["current_team"] == new_team_id:
             current_info["count"] += 1
         else:
-            # Resetar o contador se a predição mudou
             current_info["count"] = 1
             current_info["current_team"] = new_team_id
 
-        # Confirmar a mudança somente se o contador atingir o limite
         if current_info["count"] >= self.team_stable_threshold:
             return new_team_id
 
-        # Caso contrário, manter o time anterior
         return self.player_team_dict.get(player_id, new_team_id)

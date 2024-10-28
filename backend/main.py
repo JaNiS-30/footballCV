@@ -49,7 +49,7 @@ def main(input_video_path, output_video_path):
     max_speed_and_distance = (
         speed_and_distance_estimator.add_speed_and_distance_to_tracks(tracks)
     )
-    
+
     team_assigner = TeamAssigner()
     team_assigner.assign_team_color(video_frames[0], tracks["players"][0])
 
@@ -122,15 +122,8 @@ def main(input_video_path, output_video_path):
         video_frames=video_frames,
         tracks=tracks,
         tracks_pitch=tracksPitch,
-        team_ball_control=team_ball_control,
         output_video_path="output_videos/output_pitch_points.mp4",
-    )
-
-    pitch.generate_voronoi_video(
-        video_frames, tracks, "output_videos/output_voronoi_diagram.mp4"
-    )
-    pitch.generate_voronoi_blend_video(
-        video_frames, tracks, "output_videos/output_voronoi_blend.mp4"
+        output_video_path_voronoi_blend="output_videos/output_pitch_voronoi.mp4",
     )
 
 

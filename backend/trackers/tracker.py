@@ -28,25 +28,30 @@ class Tracker:
                     tracks[object][frame_num][track_id]["position"] = position
 
     def interpolate_ball_positions(self, ball_positions):
-        ball_data = [
-            (x.get(1, {}).get("bbox", []), x.get(1, {}).get("position_adjusted", None))
-            for x in ball_positions
-        ]
         
-        bbox_list = [data[0] for data in ball_data]
-        df_ball_positions = pd.DataFrame(bbox_list, columns=["x1", "y1", "x2", "y2"])
+        bbox_list = []
+        position_list = []
 
-        df_ball_positions = df_ball_positions.interpolate()
-        df_ball_positions = df_ball_positions.bfill()
+        for frame in ball_positions:
+            if 1 in frame:
+                data = frame[1]
+                bbox_list.append(data.get("bbox", [np.nan] * 4))
+                position_list.append(data.get("position_adjusted", (np.nan, np.nan)))
+            else:
+                bbox_list.append([np.nan] * 4)
+                position_list.append((np.nan, np.nan))
+
+        df_bbox = pd.DataFrame(bbox_list, columns=["x1", "y1", "x2", "y2"])
+        df_position = pd.DataFrame(position_list, columns=["x", "y"])
+
+        df_bbox = df_bbox.interpolate(method="linear").bfill().ffill()
+        df_position = df_position.interpolate(method="linear").bfill().ffill()
 
         interpolated_ball_positions = [
-            {
-                1: {
-                    "bbox": bbox,
-                    "position_adjusted": position_adjusted,
-                }
-            }
-            for bbox, (_, position_adjusted) in zip(df_ball_positions.to_numpy(), ball_data)
+            {1: {"bbox": bbox.tolist(), "position_adjusted": (pos["x"], pos["y"])}}
+            for bbox, pos in zip(
+                df_bbox.to_numpy(), df_position.to_dict(orient="records")
+            )
         ]
 
         return interpolated_ball_positions
@@ -61,7 +66,7 @@ class Tracker:
         return detections
 
     def get_object_tracks(self, frames, read_from_stub=False, stub_path=None):
-        
+
         if read_from_stub and stub_path is not None and os.path.exists(stub_path):
             with open(stub_path, "rb") as f:
                 tracks = pickle.load(f)

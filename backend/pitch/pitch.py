@@ -21,9 +21,9 @@ from PIL import Image
 
 class Pitch:
     def __init__(self, stability_threshold=5):
-        self.player_team_dict = {}  # Time atual dos jogadores
-        self.team_change_count = {}  # Contador de estabilidade
-        self.stability_threshold = stability_threshold  # Frames para confirmar troca
+        self.player_team_dict = {}
+        self.team_change_count = {}
+        self.stability_threshold = stability_threshold
 
     def update_team_with_stability(self, player_id, new_team_id):
         """Mantém a consistência do time com base em um limite de estabilidade."""
@@ -38,20 +38,16 @@ class Pitch:
         if current_info["current_team"] == new_team_id:
             current_info["count"] += 1
         else:
-            current_info["count"] = 1  # Resetar o contador se o time mudou
+            current_info["count"] = 1
             current_info["current_team"] = new_team_id
 
         if current_info["count"] >= self.stability_threshold:
-            return new_team_id  # Confirmar a mudança
+            return new_team_id
 
-        return self.player_team_dict.get(
-            player_id, new_team_id
-        )  # Manter o time anterior
+        return self.player_team_dict.get(player_id, new_team_id)
 
     def save_debug_frame_with_points(self, frame, points, name, frame_num):
-        """
-        Salva um frame com pontos anotados para debugar.
-        """
+
         for point in points:
             x, y = int(point[0]), int(point[1])
             frame = cv2.circle(frame, (x, y), radius=8, color=(0, 255, 0), thickness=-1)
@@ -64,9 +60,15 @@ class Pitch:
         return "#{:02x}{:02x}{:02x}".format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
 
     def generate_pitch_view_video(
-        self, video_frames, tracks, tracks_pitch, team_ball_control, output_video_path
+        self,
+        video_frames,
+        tracks,
+        tracks_pitch,
+        output_video_path,
+        output_video_path_voronoi_blend,
     ):
         output_video_frames = []
+        output_video_frames_voronoi_blend = []
 
         for frame_num, frame in enumerate(video_frames):
             ball_detections = tracks["ball"][frame_num]
@@ -85,22 +87,22 @@ class Pitch:
                 source=frame_reference_points, target=pitch_reference_points
             )
 
+            # Transformar posições da bola
             frame_ball_xy = [
                 ball.get("position_adjusted")
                 for ball in ball_detections.values()
                 if ball.get("position_adjusted") is not None
             ]
             frame_ball_xy = np.array(frame_ball_xy).reshape(-1, 2)
-
             pitch_ball_xy = transformer.transform_points(points=frame_ball_xy)
 
+            # Transformar posições dos jogadores e suas cores
             team_1_players = [
                 (player.get("position_adjusted"), player.get("team_color"))
                 for player in players_detections.values()
                 if player.get("position_adjusted") is not None
                 and player.get("team") == 1
             ]
-
             team_2_players = [
                 (player.get("position_adjusted"), player.get("team_color"))
                 for player in players_detections.values()
@@ -121,6 +123,7 @@ class Pitch:
             pitch_team_1_xy = transformer.transform_points(points=team_1_positions)
             pitch_team_2_xy = transformer.transform_points(points=team_2_positions)
 
+            # Transformar posições dos árbitros
             referees_xy = [
                 referee.get("position_adjusted")
                 for referee in referees_detections.values()
@@ -129,84 +132,77 @@ class Pitch:
             referees_xy = np.array(referees_xy).reshape(-1, 2)
             pitch_referees_xy = transformer.transform_points(points=referees_xy)
 
+            # Criar campos de visualização
             annotated_frame = draw_pitch(CONFIG)
-
-            # Desenhar a bola
-            annotated_frame = draw_points_on_pitch(
+            annotated_frame_voronoi_blend = draw_pitch(
                 config=CONFIG,
-                xy=pitch_ball_xy,
-                face_color=sv.Color.WHITE,
-                edge_color=sv.Color.BLACK,
-                radius=10,
-                pitch=annotated_frame,
+                background_color=sv.Color.WHITE,
+                line_color=sv.Color.BLACK,
             )
 
-            # Desenhar jogadores da equipe 1 com cor personalizada
+            # Adicionar a bola nos dois campos
+            for frame in [annotated_frame, annotated_frame_voronoi_blend]:
+                frame = draw_points_on_pitch(
+                    config=CONFIG,
+                    xy=pitch_ball_xy,
+                    face_color=sv.Color.WHITE,
+                    edge_color=sv.Color.BLACK,
+                    radius=10,
+                    pitch=frame,
+                )
+
+            # Adicionar jogadores do time 1 e 2
             for pos, color in zip(pitch_team_1_xy, team_1_colors):
                 hex_color = self.rgb_to_hex(color)
-                annotated_frame = draw_points_on_pitch(
-                    config=CONFIG,
-                    xy=[pos],
-                    face_color=sv.Color.from_hex(hex_color),
-                    edge_color=sv.Color.BLACK,
-                    radius=16,
-                    pitch=annotated_frame,
-                )
+                for frame in [annotated_frame, annotated_frame_voronoi_blend]:
+                    frame = draw_points_on_pitch(
+                        config=CONFIG,
+                        xy=[pos],
+                        face_color=sv.Color.from_hex(hex_color),
+                        edge_color=sv.Color.BLACK,
+                        radius=16,
+                        pitch=frame,
+                    )
 
-            # Desenhar jogadores da equipe 2 com cor personalizada
             for pos, color in zip(pitch_team_2_xy, team_2_colors):
                 hex_color = self.rgb_to_hex(color)
-                annotated_frame = draw_points_on_pitch(
+                for frame in [annotated_frame, annotated_frame_voronoi_blend]:
+                    frame = draw_points_on_pitch(
+                        config=CONFIG,
+                        xy=[pos],
+                        face_color=sv.Color.from_hex(hex_color),
+                        edge_color=sv.Color.BLACK,
+                        radius=16,
+                        pitch=frame,
+                    )
+
+            # Adicionar árbitros
+            for frame in [annotated_frame, annotated_frame_voronoi_blend]:
+                frame = draw_points_on_pitch(
                     config=CONFIG,
-                    xy=[pos],
-                    face_color=sv.Color.from_hex(hex_color),
+                    xy=pitch_referees_xy,
+                    face_color=sv.Color.from_hex("FFD700"),
                     edge_color=sv.Color.BLACK,
                     radius=16,
-                    pitch=annotated_frame,
+                    pitch=frame,
                 )
 
-            # Desenhar árbitros
-            annotated_frame = draw_points_on_pitch(
+            # Adicionar diagrama de Voronoi com blending
+            annotated_frame_voronoi_blend = draw_pitch_voronoi_diagram_2(
                 config=CONFIG,
-                xy=pitch_referees_xy,
-                face_color=sv.Color.from_hex("FFD700"),
-                edge_color=sv.Color.BLACK,
-                radius=16,
-                pitch=annotated_frame,
+                team_1_xy=pitch_team_1_xy,
+                team_2_xy=pitch_team_2_xy,
+                team_1_color=sv.Color.from_hex(self.rgb_to_hex(team_1_colors[0])),
+                team_2_color=sv.Color.from_hex(self.rgb_to_hex(team_2_colors[0])),
+                pitch=annotated_frame_voronoi_blend,
             )
 
+            # Adicionar frames aos vídeos
             output_video_frames.append(annotated_frame)
+            output_video_frames_voronoi_blend.append(annotated_frame_voronoi_blend)
 
         save_video(output_video_frames, output_video_path)
-
-    def generate_voronoi_video(self, video_frames, tracks, output_video_path):
-        # """
-        # Gera o vídeo com a visualização do diagrama de Voronoi.
-        # """
-        output_video_frames = []
-
-        for frame_num, frame in enumerate(video_frames):
-            players_detections = tracks["players"][frame_num]
-
-            # Extrair as coordenadas dos jogadores para cada frame
-            frame_players_xy = np.array(
-                [player["position_adjusted"] for player in players_detections.values()]
-            )
-
-            # 2. Visualizar diagrama de Voronoi
-            annotated_frame = draw_pitch(CONFIG)
-            annotated_frame = draw_pitch_voronoi_diagram(
-                config=CONFIG,
-                team_1_xy=frame_players_xy[players_detections["team"] == 0],
-                team_2_xy=frame_players_xy[players_detections["team"] == 1],
-                team_1_color=sv.Color.from_hex("00BFFF"),
-                team_2_color=sv.Color.from_hex("FF1493"),
-                pitch=annotated_frame,
-            )
-
-            output_video_frames.append(annotated_frame)
-
-        save_video(output_video_frames, output_video_path)
+        save_video(output_video_frames_voronoi_blend, output_video_path_voronoi_blend)
 
     def generate_voronoi_blend_video(self, video_frames, tracks, output_video_path):
         # """
