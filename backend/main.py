@@ -20,9 +20,9 @@ def main(input_video_path, output_video_path):
         video_frames, read_from_stub=True, stub_path="backend/stubs/tracks_stub.pkl"
     )
 
-    trackerPitch = TrackerPitch("backend/models/bestPitch.pt")
+    tracker_pitch = TrackerPitch("backend/models/bestPitch.pt")
 
-    tracksPitch = trackerPitch.get_pitch_tracks(
+    tracks_pitch = tracker_pitch.get_pitch_tracks(
         video_frames,
         read_from_stub=True,
         stub_path="backend/stubs/tracks_pitch_stub.pkl",
@@ -109,23 +109,32 @@ def main(input_video_path, output_video_path):
         video_frames, tracks, team_ball_control
     )
 
-    output_video_frames = camera_movement_estimator.draw_camera_movement(
-        output_video_frames, camera_movement_per_frame
-    )
+    # output_video_frames = camera_movement_estimator.draw_camera_movement(
+    #    output_video_frames, camera_movement_per_frame
+    # )
 
     speed_and_distance_estimator.draw_speed_and_distance(output_video_frames, tracks)
 
-    save_video(output_video_frames, output_video_path)
+    save_video(
+        output_video_frames, output_video_path="backend/output_videos/output_video.mp4"
+    )
 
     pitch = Pitch()
     pitch.generate_pitch_view_video(
         video_frames=video_frames,
         tracks=tracks,
-        tracks_pitch=tracksPitch,
-        output_video_path="output_videos/output_pitch_points.mp4",
-        output_video_path_voronoi_blend="output_videos/output_pitch_voronoi.mp4",
+        tracks_pitch=tracks_pitch,
+        output_video_path="backend/output_videos/output_pitch_points.mp4",
+        output_video_path_voronoi_blend="backend/output_videos/output_pitch_voronoi.mp4",
     )
+
+    # pitch.generate_ball_path_video(
+    #    video_frames=video_frames,
+    #    tracks=tracks,
+    #    tracks_pitch=tracks_pitch,
+    #    output_video_path="output_videos/output_ball_path_video.mp4",
+    # )
 
 
 if __name__ == "__main__":
-    main("input_videos/121364_0.mp4", "output_videos/output_video.mp4")
+    main("backend/input_videos/121364_0.mp4", "backend/output_videos/output_video.mp4")

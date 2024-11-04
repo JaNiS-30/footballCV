@@ -1,31 +1,53 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Video Processing</title>
+    <title>Processamento de Vídeo</title>
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='style.css') }}"
     />
   </head>
   <body>
-    <h1>Upload Video for Processing</h1>
+    <h1>Envie um Vídeo para Processamento</h1>
     <form id="uploadForm" enctype="multipart/form-data">
+      <label for="fileInput" class="custom-file-upload">
+        Escolher Arquivo
+      </label>
       <input type="file" name="file" id="fileInput" accept="video/*" required />
+      <span id="fileName">Nenhum arquivo selecionado</span>
       <button type="submit">Upload</button>
     </form>
-    <div id="loading" style="display: none">Processing...</div>
+    <div id="loading" style="display: none">Processando...</div>
+
     <div id="result" style="display: none">
-      <h2>Processed Video:</h2>
-      <video id="outputVideo" controls>
-        <source
-          src="http://techslides.com/demos/sample-videos/small.mp4"
-          type="video/mp4"
-        />
-      </video>
+      <h2>Vídeos Processados:</h2>
+      <div class="video-gallery">
+        <div class="video-container">
+          <h3>Vídeo Original Processado</h3>
+          <video id="outputVideo1" controls></video>
+        </div>
+        <div class="video-container">
+          <h3>Vídeo com Voronoi</h3>
+          <video id="outputVideo2" controls></video>
+        </div>
+        <div class="video-container">
+          <h3>Vídeo com Pontos do Campo</h3>
+          <video id="outputVideo3" controls></video>
+        </div>
+      </div>
     </div>
+
     <script>
+      document
+        .getElementById('fileInput')
+        .addEventListener('change', (event) => {
+          const fileName =
+            event.target.files[0]?.name || 'Nenhum arquivo selecionado';
+          document.getElementById('fileName').textContent = fileName;
+        });
+
       document
         .getElementById('uploadForm')
         .addEventListener('submit', async (event) => {
@@ -39,7 +61,7 @@
             document.getElementById('fileInput').files[0]
           );
 
-          console.log('Uploading file...');
+          console.log('Enviando arquivo...');
           const response = await fetch('/upload', {
             method: 'POST',
             body: formData,
@@ -48,17 +70,32 @@
           document.getElementById('loading').style.display = 'none';
 
           if (response.ok) {
-            console.log('File uploaded successfully');
+            console.log('Arquivo enviado com sucesso');
             const data = await response.json();
-            const videoUrl = data.video_url;
-            const videoElement = document.getElementById('outputVideo');
-            videoElement.src = videoUrl;
-            videoElement.load(); // Adicione esta linha para garantir que o vídeo seja carregado
+
+            // URLs dos vídeos processados
+            const videoUrl1 =
+              data.video_url1 || '/output_videos/output_video.mp4';
+            const videoUrl2 =
+              data.video_url2 || '/output_videos/output_pitch_voronoi.mp4';
+            const videoUrl3 =
+              data.video_url3 || '/output_videos/output_pitch_points.mp4';
+
+            // Atualiza as fontes dos vídeos
+            document.getElementById('outputVideo1').src = videoUrl1;
+            document.getElementById('outputVideo2').src = videoUrl2;
+            document.getElementById('outputVideo3').src = videoUrl3;
+
+            // Garante que os vídeos sejam carregados
+            document.getElementById('outputVideo1').load();
+            document.getElementById('outputVideo2').load();
+            document.getElementById('outputVideo3').load();
+
             document.getElementById('result').style.display = 'block';
-            console.log('Video URL:', videoUrl);
+            console.log('URLs dos vídeos:', videoUrl1, videoUrl2, videoUrl3);
           } else {
-            console.error('Failed to process video');
-            alert('Failed to process video');
+            console.error('Falha ao processar o vídeo');
+            alert('Falha ao processar o vídeo');
           }
         });
     </script>
