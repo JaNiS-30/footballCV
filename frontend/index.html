@@ -36,6 +36,10 @@
           <h3>Vídeo com Pontos do Campo</h3>
           <video id="outputVideo3" controls></video>
         </div>
+        <div class="video-container">
+          <h3>Vídeo com Track da Bola</h3>
+          <video id="outputVideo4" controls></video>
+        </div>
       </div>
     </div>
 
@@ -79,14 +83,18 @@
               data.video_url2 || '/output_videos/output_pitch_voronoi.mp4';
             const videoUrl3 =
               data.video_url3 || '/output_videos/output_pitch_points.mp4';
+            const videoUrl4 =
+              data.video_url4 || '/output_videos/output_ball_tracking.mp4';
 
             document.getElementById('outputVideo1').src = videoUrl1;
             document.getElementById('outputVideo2').src = videoUrl2;
             document.getElementById('outputVideo3').src = videoUrl3;
+            document.getElementById('outputVideo4').src = videoUrl4;
 
             document.getElementById('outputVideo1').load();
             document.getElementById('outputVideo2').load();
             document.getElementById('outputVideo3').load();
+            document.getElementById('outputVideo4').load();
 
             document.getElementById('result').style.display = 'block';
             console.log('URLs dos vídeos:', videoUrl1, videoUrl2, videoUrl3);
