@@ -25,11 +25,10 @@ class Pitch:
         self.team_change_count = {}
         self.stability_threshold = stability_threshold
         self.path_raw = []
-        self.M = []
-        self.max_distance_threshold = 500  # Defina o valor adequado aqui
+        self.M = deque(maxlen=5)
+        self.max_distance_threshold = 500
 
     def update_team_with_stability(self, player_id, new_team_id):
-        """Mantém a consistência do time com base em um limite de estabilidade."""
         if player_id not in self.team_change_count:
             self.team_change_count[player_id] = {
                 "current_team": new_team_id,
@@ -186,13 +185,17 @@ class Pitch:
         save_video(output_video_frames, output_video_path)
         save_video(output_video_frames_voronoi_blend, output_video_path_voronoi_blend)
 
-    def replace_outliers_based_on_distance(self, positions, distance_threshold):
+    def replace_outliers_based_on_distance(
+        self, positions: List[np.ndarray], distance_threshold: float = None
+    ) -> List[np.ndarray]:
+        if distance_threshold is None:
+            distance_threshold = self.max_distance_threshold
         last_valid_position = None
         cleaned_positions = []
 
         for position in positions:
-            if position is None or len(position) == 0:
-                cleaned_positions.append(np.empty((0, 2), dtype=np.float32))
+            if len(position) == 0:
+                cleaned_positions.append(position)
             else:
                 if last_valid_position is None:
                     cleaned_positions.append(position)
@@ -200,89 +203,78 @@ class Pitch:
                 else:
                     distance = np.linalg.norm(position - last_valid_position)
                     if distance > distance_threshold:
-                        cleaned_positions.append(np.empty((0, 2), dtype=np.float32))
+                        cleaned_positions.append(np.array([], dtype=np.float64))
                     else:
                         cleaned_positions.append(position)
                         last_valid_position = position
 
         return cleaned_positions
 
-    def generate_ball_path_video(
-        self, video_frames, tracks, tracks_pitch, output_video_path
+    def generate_ball_tracking_video(
+        self,
+        video_frames,
+        tracks,
+        tracks_pitch,
+        output_video_path,
     ):
-        output_video_frames = []
-
-        # Inicializar path_raw para armazenar os caminhos
-        self.path_raw = []
+        output_video_frames_ball_tracking = []
+        ball_path = deque(maxlen=30)
 
         for frame_num, frame in enumerate(video_frames):
-            # Verificar se temos dados da bola e do campo para o frame atual
-            if frame_num >= len(tracks["ball"]) or frame_num >= len(
-                tracks_pitch["keypoints"]
-            ):
-                continue
-
             ball_detections = tracks["ball"][frame_num]
             pitch_track = tracks_pitch["keypoints"][frame_num]
 
-            # Verificar se pitch_track possui dados válidos
-            if (
-                not pitch_track
-                or "confidences" not in pitch_track
-                or "filtered_points" not in pitch_track
-            ):
-                continue
-
-            # Filtrar pontos válidos com confiança > 0.5
             filter = pitch_track["confidences"] > 0.5
-            frame_reference_points = np.array(pitch_track["filtered_points"])[filter]
+            frame_reference_points = pitch_track["filtered_points"][filter]
             pitch_reference_points = np.array(CONFIG.vertices)[filter]
 
-            # Ignorar frames sem pontos de referência válidos
-            if frame_reference_points.size == 0 or pitch_reference_points.size == 0:
-                continue
+            frame_reference_points = np.array(frame_reference_points, dtype=np.float32)
+            pitch_reference_points = np.array(pitch_reference_points, dtype=np.float32)
 
-            # Configurar o transformer para transformar as coordenadas
             transformer = ViewTransformer(
                 source=frame_reference_points, target=pitch_reference_points
             )
+
             self.M.append(transformer.m)
             transformer.m = np.mean(np.array(self.M), axis=0)
 
-            # Extrair coordenadas ajustadas da bola e transformá-las
             frame_ball_xy = [
                 ball.get("position_adjusted")
-                for ball_id, ball in ball_detections.items()
-                if ball and ball.get("position_adjusted") is not None
+                for ball in ball_detections.values()
+                if ball.get("position_adjusted") is not None
             ]
 
-            if frame_ball_xy:
-                frame_ball_xy = np.array(frame_ball_xy).reshape(-1, 2)
-                pitch_ball_xy = transformer.transform_points(points=frame_ball_xy)
-            else:
-                pitch_ball_xy = np.empty((0, 2), dtype=np.float32)
+            if not frame_ball_xy:
+                continue
 
-            self.path_raw.append(pitch_ball_xy)
+            frame_ball_xy = np.array(frame_ball_xy).reshape(-1, 2)
+            pitch_ball_xy = transformer.transform_points(points=frame_ball_xy)
 
-        # Processar o caminho e remover outliers
-        path = [
-            np.empty((0, 2), dtype=np.float32) if coordinates.size < 2 else coordinates
-            for coordinates in self.path_raw
-        ]
-        path = self.replace_outliers_based_on_distance(
-            path, self.max_distance_threshold
-        )
+            pitch_ball_xy = np.squeeze(pitch_ball_xy)
 
-        # Criar o vídeo com o caminho da bola
-        for frame_num, frame in enumerate(video_frames):
+            if frame_num == 0:
+                print(frame_ball_xy)
+                print(pitch_ball_xy)
+
+            print(frame_num)
+            ball_path.append(pitch_ball_xy)
+            cleaned_path = self.replace_outliers_based_on_distance(list(ball_path))
+
+            if frame_num == 0:
+                print(cleaned_path)
+
             annotated_frame = draw_pitch(CONFIG)
             annotated_frame = draw_paths_on_pitch(
-                config=CONFIG, paths=[path], color=sv.Color.WHITE, pitch=annotated_frame
+                config=CONFIG,
+                paths=[cleaned_path],
+                color=sv.Color.WHITE,
+                pitch=annotated_frame,
             )
-            output_video_frames.append(annotated_frame)
 
-        # Salvar o vídeo
-        save_video(output_video_frames, output_video_path)
+            if annotated_frame is not None:
+                output_video_frames_ball_tracking.append(annotated_frame)
+
+        save_video(output_video_frames_ball_tracking, output_video_path)
 
     def normalize_coordinates(self, positions, field_width, field_height):
         return np.array([[x * field_width, y * field_height] for x, y in positions])

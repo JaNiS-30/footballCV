@@ -21,7 +21,7 @@ form {
 }
 
 input[type='file'] {
-  display: none; /* Esconde o campo de entrada de arquivo original */
+  display: none;
 }
 
 .custom-file-upload {

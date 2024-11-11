@@ -73,7 +73,6 @@
             console.log('Arquivo enviado com sucesso');
             const data = await response.json();
 
-            // URLs dos vídeos processados
             const videoUrl1 =
               data.video_url1 || '/output_videos/output_video.mp4';
             const videoUrl2 =
@@ -81,12 +80,10 @@
             const videoUrl3 =
               data.video_url3 || '/output_videos/output_pitch_points.mp4';
 
-            // Atualiza as fontes dos vídeos
             document.getElementById('outputVideo1').src = videoUrl1;
             document.getElementById('outputVideo2').src = videoUrl2;
             document.getElementById('outputVideo3').src = videoUrl3;
 
-            // Garante que os vídeos sejam carregados
             document.getElementById('outputVideo1').load();
             document.getElementById('outputVideo2').load();
             document.getElementById('outputVideo3').load();

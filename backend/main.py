@@ -126,14 +126,14 @@ def main(input_video_path, output_video_path):
         tracks_pitch=tracks_pitch,
         output_video_path="backend/output_videos/output_pitch_points.mp4",
         output_video_path_voronoi_blend="backend/output_videos/output_pitch_voronoi.mp4",
-    )
+     )
 
-    # pitch.generate_ball_path_video(
-    #    video_frames=video_frames,
-    #    tracks=tracks,
-    #    tracks_pitch=tracks_pitch,
-    #    output_video_path="output_videos/output_ball_path_video.mp4",
-    # )
+    pitch.generate_ball_tracking_video(
+        video_frames=video_frames,
+        tracks=tracks,
+        tracks_pitch=tracks_pitch,
+        output_video_path="backend/output_videos/output_ball_tracking.mp4",
+    )
 
 
 if __name__ == "__main__":

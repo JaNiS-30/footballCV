@@ -24,6 +24,7 @@ def save_video(output_video_frames, output_video_path):
         25,
         (output_video_frames[0].shape[1], output_video_frames[0].shape[0]),
     )
+    
     for frame in output_video_frames:
         out.write(frame)
     out.release()
