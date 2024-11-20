@@ -2,8 +2,6 @@ from ultralytics import YOLO
 import supervision as sv
 import pickle
 import os
-import numpy as np
-from PIL import Image  # Importação correta
 from sports.configs.soccer import SoccerPitchConfiguration
 
 CONFIG = SoccerPitchConfiguration()

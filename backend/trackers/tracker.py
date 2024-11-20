@@ -28,7 +28,7 @@ class Tracker:
                     tracks[object][frame_num][track_id]["position"] = position
 
     def interpolate_ball_positions(self, ball_positions):
-        
+
         bbox_list = []
         position_list = []
 
@@ -231,6 +231,12 @@ class Tracker:
 
     def draw_annotations(self, video_frames, tracks, team_ball_control):
         output_video_frames = []
+        team_passes = {1: 0, 2: 0}  
+        last_team_with_ball = None
+        last_player_with_ball = None
+
+        min_frames_for_pass = 7
+        min_frames_for_possession = 7
 
         for frame_num, frame in enumerate(video_frames):
             frame = frame.copy()
@@ -238,6 +244,21 @@ class Tracker:
             player_dict = tracks["players"][frame_num]
             ball_dict = tracks["ball"][frame_num]
             referee_dict = tracks["referees"][frame_num]
+
+            team_passes_increment, last_team_with_ball, last_player_with_ball = (
+                self.count_passes(
+                    player_dict,
+                    team_ball_control,
+                    last_team_with_ball,
+                    last_player_with_ball,
+                    frame_num,
+                    min_frames_for_pass,
+                    min_frames_for_possession,
+                )
+            )
+
+            for team, passes in team_passes_increment.items():
+                team_passes[team] += passes
 
             for track_id, player in player_dict.items():
                 color = player.get("team_color", (0, 0, 255))
@@ -256,4 +277,44 @@ class Tracker:
 
             output_video_frames.append(frame)
 
-        return output_video_frames
+        return output_video_frames, team_passes
+
+    def count_passes(
+        self,
+        player_dict,
+        team_ball_control,
+        last_team_with_ball,
+        last_player_with_ball,
+        frame_num,
+        min_frames_for_pass=5,
+        min_frames_for_possession=5,
+    ):
+        team_passes = {1: 0, 2: 0}  
+        current_team = team_ball_control[frame_num]
+
+        if not hasattr(self, "same_player_frame_count"):
+            self.same_player_frame_count = 0
+        if not hasattr(self, "same_team_frame_count"):
+            self.same_team_frame_count = 0
+
+        for track_id, player in player_dict.items():
+            if player.get("has_ball", False):
+                if current_team == last_team_with_ball:
+                    self.same_team_frame_count += 1
+                    if track_id == last_player_with_ball:
+                        self.same_player_frame_count += 1
+                    else:
+                        if self.same_player_frame_count >= min_frames_for_pass:
+                            team_passes[current_team] += 1
+
+                        self.same_player_frame_count = 1
+                        last_player_with_ball = track_id
+                else:
+                    self.same_team_frame_count += 1
+                    if self.same_team_frame_count >= min_frames_for_possession:
+                        last_team_with_ball = current_team
+                        last_player_with_ball = track_id
+                        self.same_player_frame_count = 1 
+                        self.same_team_frame_count = 1 
+
+        return team_passes, last_team_with_ball, last_player_with_ball

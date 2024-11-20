@@ -43,9 +43,17 @@ def upload_file():
         file.save(input_path)
         logging.info(f"Processing video from {input_path} to {output_path}")
         try:
-            process_video(input_path, output_path)
+            stats = process_video(input_path, output_path)
+
             logging.info(f"Video processed successfully, sending file {output_path}")
-            return {"video_url": url_for("get_video", filename="output_video.mp4")}
+
+            return {
+                "video_url": url_for("get_video", filename="output_video.mp4"),
+                "team_passes": stats["team_passes"],
+                "team_possession": stats["team_possession"],
+                "heatmap_team_1": url_for("get_video", filename="team_1_heatmap.png"),
+                "heatmap_team_2": url_for("get_video", filename="team_2_heatmap.png"),
+            }
         except Exception as e:
             logging.error(f"Error processing video: {e}")
             return "Failed to process video", 500

@@ -41,6 +41,38 @@
           <video id="outputVideo4" controls></video>
         </div>
       </div>
+      <div class="heatmaps">
+        <h3>Heatmaps</h3>
+        <div class="heatmap-container">
+          <h4>Equipe 1</h4>
+          <img id="heatmapTeam1" src="" alt="Heatmap Equipe 1" />
+        </div>
+        <div class="heatmap-container">
+          <h4>Equipe 2</h4>
+          <img id="heatmapTeam2" src="" alt="Heatmap Equipe 2" />
+        </div>
+      </div>
+      <div id="stats">
+        <h3>Estatísticas de Jogo:</h3>
+        <p id="team1Passes">Team 1 Passes: -</p>
+        <p id="team2Passes">Team 2 Passes: -</p>
+        <p id="team1Possession">Team 1 Possession: -</p>
+        <p id="team2Possession">Team 2 Possession: -</p>
+      </div>
+
+      <div class="bar-container">
+        <h3>Posse de Bola</h3>
+        <div class="possession-bar">
+          <div id="team1PossessionBar" class="bar team1"></div>
+          <div id="team2PossessionBar" class="bar team2"></div>
+        </div>
+
+        <h3>Passes</h3>
+        <div class="passes-bar">
+          <div id="team1PassesBar" class="bar team1"></div>
+          <div id="team2PassesBar" class="bar team2"></div>
+        </div>
+      </div>
     </div>
 
     <script>
@@ -65,7 +97,6 @@
             document.getElementById('fileInput').files[0]
           );
 
-          console.log('Enviando arquivo...');
           const response = await fetch('/upload', {
             method: 'POST',
             body: formData,
@@ -74,7 +105,6 @@
           document.getElementById('loading').style.display = 'none';
 
           if (response.ok) {
-            console.log('Arquivo enviado com sucesso');
             const data = await response.json();
 
             const videoUrl1 =
@@ -86,6 +116,16 @@
             const videoUrl4 =
               data.video_url4 || '/output_videos/output_ball_tracking.mp4';
 
+            const imgUrl1 =
+              data.heatmap_team_1 || '/output_videos/team_1_heatmap.png';
+            const imgUrl2 =
+              data.heatmap_team_2 || '/output_videos/team_2_heatmap.png';
+
+            document.getElementById('heatmapTeam1').src = imgUrl1;
+            document.getElementById('heatmapTeam1').style.display = 'block';
+            document.getElementById('heatmapTeam2').src = imgUrl2;
+            document.getElementById('heatmapTeam2').style.display = 'block';
+
             document.getElementById('outputVideo1').src = videoUrl1;
             document.getElementById('outputVideo2').src = videoUrl2;
             document.getElementById('outputVideo3').src = videoUrl3;
@@ -96,8 +136,61 @@
             document.getElementById('outputVideo3').load();
             document.getElementById('outputVideo4').load();
 
+            const teamPasses = data.team_passes;
+            const teamPossession = data.team_possession;
+
+            // Exibir os números de posse e passes
+            document.getElementById(
+              'team1Passes'
+            ).textContent = `Team 1 Passes: ${teamPasses[1]}`;
+            document.getElementById(
+              'team2Passes'
+            ).textContent = `Team 2 Passes: ${teamPasses[2]}`;
+            document.getElementById(
+              'team1Possession'
+            ).textContent = `Team 1 Possession: ${teamPossession.team_1.toFixed(
+              2
+            )}%`;
+            document.getElementById(
+              'team2Possession'
+            ).textContent = `Team 2 Possession: ${teamPossession.team_2.toFixed(
+              2
+            )}%`;
+
             document.getElementById('result').style.display = 'block';
-            console.log('URLs dos vídeos:', videoUrl1, videoUrl2, videoUrl3);
+
+            // Atualizar as barras de posse de bola
+            document.getElementById(
+              'team1PossessionBar'
+            ).style.width = `${teamPossession.team_1}%`;
+            document.getElementById(
+              'team1PossessionBar'
+            ).textContent = `${teamPossession.team_1.toFixed(2)}%`;
+            document.getElementById(
+              'team2PossessionBar'
+            ).style.width = `${teamPossession.team_2}%`;
+            document.getElementById(
+              'team2PossessionBar'
+            ).textContent = `${teamPossession.team_2.toFixed(2)}%`;
+
+            // Calcula o total de passes e as porcentagens
+            const totalPasses = teamPasses[1] + teamPasses[2];
+            const team1PassesPercent = (teamPasses[1] / totalPasses) * 100;
+            const team2PassesPercent = (teamPasses[2] / totalPasses) * 100;
+
+            // Atualizar as barras de passes
+            document.getElementById(
+              'team1PassesBar'
+            ).style.width = `${team1PassesPercent}%`;
+            document.getElementById(
+              'team1PassesBar'
+            ).textContent = `${team1PassesPercent.toFixed(2)}%`;
+            document.getElementById(
+              'team2PassesBar'
+            ).style.width = `${team2PassesPercent}%`;
+            document.getElementById(
+              'team2PassesBar'
+            ).textContent = `${team2PassesPercent.toFixed(2)}%`;
           } else {
             console.error('Falha ao processar o vídeo');
             alert('Falha ao processar o vídeo');

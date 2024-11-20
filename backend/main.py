@@ -8,7 +8,6 @@ from camera_movement_estimator import CameraMovementEstimator
 from view_transformer import ViewTransformer
 from speed_and_distance_estimator import SpeedAndDistanceEstimator
 from pitch import Pitch
-from inference import get_model
 
 
 def main(input_video_path, output_video_path):
@@ -105,13 +104,13 @@ def main(input_video_path, output_video_path):
 
     team_ball_control = np.array(team_ball_control)
 
-    output_video_frames = tracker.draw_annotations(
+    output_video_frames, team_passes = tracker.draw_annotations(
         video_frames, tracks, team_ball_control
     )
 
-    # output_video_frames = camera_movement_estimator.draw_camera_movement(
-    #    output_video_frames, camera_movement_per_frame
-    # )
+    total_frames = len(team_ball_control)
+    team_1_possession = np.sum(team_ball_control == 1) / total_frames * 100
+    team_2_possession = np.sum(team_ball_control == 2) / total_frames * 100
 
     speed_and_distance_estimator.draw_speed_and_distance(output_video_frames, tracks)
 
@@ -126,7 +125,7 @@ def main(input_video_path, output_video_path):
         tracks_pitch=tracks_pitch,
         output_video_path="backend/output_videos/output_pitch_points.mp4",
         output_video_path_voronoi_blend="backend/output_videos/output_pitch_voronoi.mp4",
-     )
+    )
 
     pitch.generate_ball_tracking_video(
         video_frames=video_frames,
@@ -134,6 +133,18 @@ def main(input_video_path, output_video_path):
         tracks_pitch=tracks_pitch,
         output_video_path="backend/output_videos/output_ball_tracking.mp4",
     )
+
+    pitch.generate_team_heatmaps(
+        tracks=tracks,
+        tracks_pitch=tracks_pitch,
+        output_path_team_1="backend/output_videos/team_1_heatmap.png",
+        output_path_team_2="backend/output_videos/team_2_heatmap.png",
+    )
+
+    return {
+        "team_passes": team_passes,
+        "team_possession": {"team_1": team_1_possession, "team_2": team_2_possession},
+    }
 
 
 if __name__ == "__main__":

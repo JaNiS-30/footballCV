@@ -2,6 +2,8 @@ import numpy as np
 from collections import deque
 from typing import List, Union
 import supervision as sv
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sports.annotators.soccer import (
     draw_pitch,
     draw_points_on_pitch,
@@ -125,7 +127,7 @@ class Pitch:
                 background_color=sv.Color.WHITE,
                 line_color=sv.Color.BLACK,
             )
-
+            print("aaaa")
             for frame in [annotated_frame, annotated_frame_voronoi_blend]:
                 frame = draw_points_on_pitch(
                     config=CONFIG,
@@ -135,6 +137,7 @@ class Pitch:
                     radius=10,
                     pitch=frame,
                 )
+            print("bbbb")
 
             for pos, color in zip(pitch_team_1_xy, team_1_colors):
                 hex_color = self.rgb_to_hex(color)
@@ -148,17 +151,37 @@ class Pitch:
                         pitch=frame,
                     )
 
-            for pos, color in zip(pitch_team_2_xy, team_2_colors):
-                hex_color = self.rgb_to_hex(color)
-                for frame in [annotated_frame, annotated_frame_voronoi_blend]:
-                    frame = draw_points_on_pitch(
-                        config=CONFIG,
-                        xy=[pos],
-                        face_color=sv.Color.from_hex(hex_color),
-                        edge_color=sv.Color.BLACK,
-                        radius=16,
-                        pitch=frame,
-                    )
+            print("cccc")
+            if len(pitch_team_2_xy) != len(team_2_colors) or len(pitch_team_2_xy) == 0:
+                print(
+                    f"Erro: Desbalanceamento ou ausência de dados para a equipe 2. "
+                    f"Posições: {len(pitch_team_2_xy)}, Cores: {len(team_2_colors)}"
+                )
+            else:
+                for pos, color in zip(pitch_team_2_xy, team_2_colors):
+                    if color is None or len(color) == 0:
+                        print("Cor inválida encontrada, ignorando.")
+                        continue
+
+                    try:
+                        if pos is None or not np.isfinite(pos).all():
+                            print("Posição inválida encontrada, ignorando.")
+                            continue
+
+                        hex_color = self.rgb_to_hex(color)
+                        for frame in [annotated_frame, annotated_frame_voronoi_blend]:
+                            frame = draw_points_on_pitch(
+                                config=CONFIG,
+                                xy=[pos],
+                                face_color=sv.Color.from_hex(hex_color),
+                                edge_color=sv.Color.BLACK,
+                                radius=16,
+                                pitch=frame,
+                            )
+                    except Exception as e:
+                        print(f"Erro ao processar posição ou cor: {e}")
+
+            print("dddd")
 
             for frame in [annotated_frame, annotated_frame_voronoi_blend]:
                 frame = draw_points_on_pitch(
@@ -169,6 +192,7 @@ class Pitch:
                     radius=16,
                     pitch=frame,
                 )
+            print("eeee")
 
             annotated_frame_voronoi_blend = draw_pitch_voronoi_diagram_2(
                 config=CONFIG,
@@ -252,16 +276,8 @@ class Pitch:
 
             pitch_ball_xy = np.squeeze(pitch_ball_xy)
 
-            if frame_num == 0:
-                print(frame_ball_xy)
-                print(pitch_ball_xy)
-
-            print(frame_num)
             ball_path.append(pitch_ball_xy)
             cleaned_path = self.replace_outliers_based_on_distance(list(ball_path))
-
-            if frame_num == 0:
-                print(cleaned_path)
 
             annotated_frame = draw_pitch(CONFIG)
             annotated_frame = draw_paths_on_pitch(
@@ -275,6 +291,87 @@ class Pitch:
                 output_video_frames_ball_tracking.append(annotated_frame)
 
         save_video(output_video_frames_ball_tracking, output_video_path)
+
+    def generate_team_heatmaps(
+        self,
+        tracks,
+        tracks_pitch,
+        output_path_team_1,
+        output_path_team_2,
+    ):
+        team_1_positions_2d = []
+        team_2_positions_2d = []
+
+        for frame_num, frame_data in enumerate(tracks_pitch["keypoints"]):
+            pitch_track = tracks_pitch["keypoints"][frame_num]
+            filter = pitch_track["confidences"] > 0.5
+            frame_reference_points = pitch_track["filtered_points"][filter]
+            pitch_reference_points = np.array(CONFIG.vertices)[filter]
+
+            if not len(frame_reference_points) or not len(pitch_reference_points):
+                continue
+
+            frame_reference_points = np.array(frame_reference_points, dtype=np.float32)
+            pitch_reference_points = np.array(pitch_reference_points, dtype=np.float32)
+
+            transformer = ViewTransformer(
+                source=frame_reference_points, target=pitch_reference_points
+            )
+
+            for player_id, player_data in tracks["players"][frame_num].items():
+                if player_data["position_adjusted"] is not None:
+                    position = np.array(player_data["position_adjusted"]).reshape(1, -1)
+                    transformed_position = transformer.transform_points(points=position)
+                    if player_data["team"] == 1:
+                        team_1_positions_2d.append(transformed_position[0])
+                    elif player_data["team"] == 2:
+                        team_2_positions_2d.append(transformed_position[0])
+
+        self._generate_heatmap(
+            team_1_positions_2d, "Heatmap - Equipe 1", output_path_team_1
+        )
+        self._generate_heatmap(
+            team_2_positions_2d, "Heatmap - Equipe 2", output_path_team_2
+        )
+
+    def _generate_heatmap(self, positions, title, output_path):
+        if not positions:
+            print(f"Sem dados para gerar o {title}.")
+            return
+
+        x, y = zip(*positions)
+
+        x = np.array(x) * 0.65 
+        y = np.array(y) * 1.2 
+
+        plt.figure(figsize=(12, 7))
+
+        field = draw_pitch(CONFIG)
+        plt.imshow(
+            field, extent=[0, CONFIG.width, 0, CONFIG.length], aspect="auto"
+        )
+
+        ax = plt.gca()
+        ax.set_xlim(0, CONFIG.width)
+        ax.set_ylim(0, CONFIG.length)
+
+        sns.kdeplot(
+            x=x,
+            y=y,
+            cmap="Reds",  
+            fill=True,
+            alpha=0.7,  
+            bw_adjust=1.5,  
+            clip=(
+                (0, CONFIG.width),
+                (0, CONFIG.length),
+            ),  
+        )
+
+        plt.title(title)
+        plt.axis("off") 
+        plt.savefig(output_path, bbox_inches="tight", dpi=300)
+        plt.close()
 
     def normalize_coordinates(self, positions, field_width, field_height):
         return np.array([[x * field_width, y * field_height] for x, y in positions])

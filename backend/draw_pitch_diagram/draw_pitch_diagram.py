@@ -76,13 +76,11 @@ def draw_pitch_voronoi_diagram_2(
     min_distances_team_1 = np.min(distances_team_1, axis=0)
     min_distances_team_2 = np.min(distances_team_2, axis=0)
 
-    # Increase steepness of the blend effect
-    steepness = 15  # Increased steepness for sharper transition
+    steepness = 15  
     distance_ratio = min_distances_team_2 / np.clip(min_distances_team_1 + min_distances_team_2, a_min=1e-5, a_max=None)
     blend_factor = np.tanh((distance_ratio - 0.5) * steepness) * 0.5 + 0.5
 
-    # Create the smooth color transition
-    for c in range(3):  # Iterate over the B, G, R channels
+    for c in range(3):  
         voronoi[:, :, c] = (blend_factor * team_1_color_bgr[c] +
                             (1 - blend_factor) * team_2_color_bgr[c]).astype(np.uint8)
 

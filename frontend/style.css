@@ -89,3 +89,65 @@ video {
   width: 100%;
   border-radius: 5px;
 }
+
+.bar-container {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.possession-bar,
+.passes-bar {
+  display: flex;
+  height: 30px;
+  width: 100%;
+  background-color: #e0e0e0;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.bar {
+  height: 100%;
+  text-align: center;
+  color: #fff;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.team1 {
+  background-color: rgba(75, 192, 192, 0.7);
+}
+
+.team2 {
+  background-color: rgba(153, 102, 255, 0.7);
+}
+
+.heatmaps {
+  margin-top: 20px;
+  text-align: center; 
+}
+
+.heatmap-container {
+  display: inline-block; 
+  margin: 20px; 
+  text-align: center; 
+}
+
+.heatmap-container img {
+  max-width: 100%; 
+  height: auto; 
+  border: 2px solid #ccc;
+  border-radius: 8px;
+}
+
+#heatmapTeam1 {
+  width: 500px;
+  height: auto;
+}
+
+#heatmapTeam2 {
+  width: 500px;
+  height: auto;
+}
